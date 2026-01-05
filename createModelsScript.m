@@ -6,7 +6,7 @@ clc;clear;
 % delete this section
 addpath(genpath("ParseGP"))
 addpath(genpath("Satellites"))
-addpath(genpath("vallado"))
+addpath(genpath("fundamentals-of-astrodynamics"))
 if exist('mu')
     path = which('mu');
     rmpath(path(1:end-4));

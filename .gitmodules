@@ -1,0 +1,6 @@
+[submodule "ParseGP"]
+	path = ParseGP
+	url = https://github.com/eladden/ParseGP.git
+[submodule "fundamentals-of-astrodynamics"]
+	path = fundamentals-of-astrodynamics
+	url = https://github.com/CelesTrak/fundamentals-of-astrodynamics.git

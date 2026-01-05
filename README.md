@@ -20,6 +20,13 @@ This framework implements a bi-level evolutionary optimization approach for Mult
 
 ---
 
+## MATLAB Requirements
+
+- MATLAB R2020b or later
+- Parallel Computing Toolbox (optional, for faster computation)
+
+---
+
 ## Installation
 
 ### 1. Clone the Repository
@@ -33,20 +40,15 @@ cd <repository-name>
 
 This project requires several submodules for parsing, orbital mechanics utilities, and Lambert solvers:
 
-```bash
-git submodule init
-git submodule update
-```
-
 The required submodules are:
 - `ParseGP/` - TLE parsing utilities
-- `Satellites/` - Satellite data storage
 - `vallado/` - Vallado's astrodynamics utilities (includes Lambert solvers)
 
-### 3. MATLAB Requirements
-
-- MATLAB R2020b or later
-- Parallel Computing Toolbox (optional, for faster computation)
+Add them using
+```bash
+git submodule add https://github.com/eladden/ParseGP.git
+git submodule add https://github.com/CelesTrak/fundamentals-of-astrodynamics.git
+```
 
 ---
 
