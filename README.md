@@ -32,8 +32,8 @@ This framework implements a bi-level evolutionary optimization approach for Mult
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/BraudeMechInd4-0/MDAR.git
+cd MDAR
 ```
 
 ### 2. Initialize Submodules
@@ -226,4 +226,5 @@ For questions or issues, please contact:
 This research uses:
 - Modified Picard-Chebyshev Integration (Woollands & Junkins, 2019; Bai & Junkins, 2011)
 - Perturbed Lambert solver (Thompson et al., 2018)
+
 - Vallado's astrodynamics utilities (Vallado, 2022)
