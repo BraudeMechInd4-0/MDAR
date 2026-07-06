@@ -2,10 +2,9 @@
 
 This repository contains the implementation code for the paper:
 
-**"Bi-level Evolutionary Framework for Designing Multi-Debris Active Removal Missions"**  
-By Elad Denenberg and Adham Salih
-
-*Full citation will be added upon publication.*
+Elad Denenberg, Adham Salih, **"Bi-level Evolutionary Framework for Designing Multi-Debris Active Removal Missions"**,
+Acta Astronautica, Volume 246, 2026, Pages 247-257, ISSN 0094-5765,
+https://doi.org/10.1016/j.actaastro.2026.04.002.
 
 ---
 
