@@ -227,3 +227,5 @@ This research uses:
 - Perturbed Lambert solver (Thompson et al., 2018)
 
 - Vallado's astrodynamics utilities (Vallado, 2022)
+
+- Mostapha Kalami Heris, Yarpiz Evolutionary Algorithms Toolbox for MATLAB (YPEA), Yarpiz, 2020.
