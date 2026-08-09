@@ -1,7 +1,7 @@
 function [tout,xout,errorOutput,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
-%[tout,xout,error] = odeMPCI(ODEFUN, TSPAN,X0)
-%[tout,xout,error] = odeMPCI(ODEFUN, TSPAN,X0,options)
-%[tout,xout,error,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
+%[t,x,err] = odeMPCI(ODEFUN, TSPAN,X0)
+%[t,x,err] = odeMPCI(ODEFUN, TSPAN,X0,options)
+%[tout,xout,errorOutput,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
 %Bai's [1] MPCI integration method, as described in [2]
 % Useage
 %       ODEFUN - the function to integrate (the f in the equation dx/dt = f(x,t))
@@ -13,7 +13,7 @@ function [tout,xout,errorOutput,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
 %       options.N      - number of timepoints to be sampled. Optional if TSPAN is a
 %                 vector longer than 2, mandatory if it is [Tstart,Tend]
 %       options.deltaT - The timestep over each to fit the polynomial.
-%       options.xtinit - An initial guess. For astrodynamics it is customery to use
+%       options.xinit - An initial guess. For astrodynamics it is customery to use
 %                the solution for the two body problem, or even better one
 %                of the SGP analytical methods.
 %       tout   - A list of time points
@@ -34,6 +34,9 @@ errorOutput = 0;
 if nargin <3
     error("not enough input arguments");
 end
+if nargin <4
+    options = [];
+end
 if ~isfield(options, 'AbsTol')
     AbsTol = 1e-12;
 else
@@ -42,7 +45,12 @@ end
 if ~isfield(options, 'RelTol')
     RelTol = 1e-9;
 else
-    RelTol = options.AbsTol;
+    RelTol = options.RelTol;
+end
+if ~isfield(options, 'maxIter')
+    maxIter = 2000;
+else
+    maxIter = options.maxIter;
 end
 if  ~isfield(options, 'N')
     if length(TSPAN) > 2
@@ -58,6 +66,9 @@ if ~isfield(options,'Sec') || isnan(options.Sec) || ~isreal(options.Sec)
 else
     Sec= options.Sec;
 end
+if Sec > TSPAN(end)
+    Sec = TSPAN(end);
+end
 outputmodel = false;
 if nargout ==4
     outputmodel = true;
@@ -65,10 +76,15 @@ end
 N = N-1; %because it's 0 - N in all places so if N is 32 and we don't deduct one we get 33 points. 
 tstart = 0;
 tend = Sec;
-output_length = N*ceil(TSPAN(end)/Sec)+1;
+if length(TSPAN) == 2
+    output_length = N*ceil(TSPAN(end)/Sec)+1;
+else
+    output_length = length(TSPAN);
+end
 firstpos = 1;
 lastpos = NaN;
-xout = NaN(output_length,6);
+vector_length = length(X0);
+xout = NaN(output_length,vector_length);
 xout(1,:) = X0;
 tout = NaN(output_length,1);
 
@@ -77,7 +93,7 @@ if outputmodel
     model_counter = 1;
     model.ts = zeros(model_length+1,1);
     model.ts(1) = 0;
-    model.bi = NaN(model_length,N+1,6);
+    model.bi = NaN(model_length,N+1,vector_length);
 else
     model = [];
 end
@@ -92,55 +108,69 @@ if ~isfield(options,'xinit')
         X0 = X0';
     end
 
-    xtinit = repmat(X0,[length(tau),1]); %innitial guess
+    xinit = repmat(X0,[length(tau),1]); %innitial guess
+else
+    xinit = options.xinit;
 end
 
 X0 = [X0;zeros(N,length(X0))];
-lastrunflag = false;
+if Sec < TSPAN(end)
+    lastrunflag = false;
+else
+    lastrunflag = true;
+end
+
+%% First Creat the Vectors and matrices
+W = eye(length(tau));
+W(1,1) = 0.5;
+W(end,end) = 0.5;
+T = cos((0:N-1)'*acos(tau))'; %eq A6 k = 0,1,2,...N-1
+Tm1 = cos((0:N).*pi()); %acos(-1) = pi;
+L = [Tm1;zeros(N,N+1)];
+s_ = 1./(4:2:2*N);
+S_3 = zeros(N+1);
+S_3(2:end,2:end) = diag([-.5,-s_(1:end-1)],1);
+S_2 = diag([1,s_],-1);
+S_1 = S_2+S_3;
+S = S_1(:,1:N);
+S(1,:) = [1/4, zeros(1,N-1)];
+A = (T'*W*T)\T'*W;
+T = cos((0:N)'*acos(tau))';
+
 while true
-    xold = xtinit;%zeros(length(tau),length(X0)); %innitial guess
+    xold = xinit;%zeros(length(tau),length(X0)); %innitial guess
     om2 = (tend-tstart)/2;
     om1 = (tend+tstart)/2;
 
-    %% First Creat the Vectors and matrices
-    W = eye(length(tau));
-    W(1,1) = 0.5;
-    W(end,end) = 0.5;
-    T = cos((0:N-1)'*acos(tau))'; %eq A6 k = 0,1,2,...N-1
-    Tm1 = cos((0:N).*pi()); %acos(-1) = pi;
-    L = [Tm1;zeros(N,N+1)];
-    s_ = 1./(4:2:2*N);
-    S_3 = zeros(N+1);
-    S_3(2:end,2:end) = diag([-.5,-s_(1:end-1)],1);
-    S_2 = diag([1,s_],-1);
-    S_1 = S_2+S_3;
-    S = S_1(:,1:N);
-    S(1,:) = [1/4, zeros(1,N-1)];
-    A = (T'*W*T)\T'*W;
-
-
     %% Get the function g using picard iterations
-
-    T = cos((0:N)'*acos(tau))';   
     eAbs = inf;
     eRel = inf;
     i = 0;
-    while (eAbs  > AbsTol || eRel > RelTol) && i<2000
-        F = ODEFUN(om2.*tau+om1,xold); 
+    while (eAbs  > AbsTol || eRel > RelTol) && i<maxIter
+        F = ODEFUN(om2.*tau+om1,xold); % the VMPCM uses F = ode(input{:}).*omega2; because dx/dtau = dx/dt.dtau/dt, but APC seemed to have accounted for that in the next line
         P1 = om2*(eye(N+1) - L) * S;
         bi = X0 + P1 * A * F;
         xnew = T*bi;
+        if any(isnan(xnew),'all')
+            warning("did not converge - exploaded")
+            errorOutput = -2;
+            tout = 0;
+            xout = NaN(1, vector_length);  % Return consistent dimensions with NaN
+            return
+        end
         eAbs = max(abs(xnew - xold),[],'all');
-        eRel = max(abs(xnew - xold)./min(xnew,xold),[],'all');
+        scale = max(abs(xnew), abs(xold)) + AbsTol/10;
+        eRel = max(abs(xnew - xold) ./ scale, [], 'all');
         xold = xnew;
         i = i+1;
     end
+    
 
-    if i >= 4000
-        %error("did not converge")
+    if i >= maxIter
+        warning("did not converge")
         errorOutput = -1;
         tout = 0;
-        xout=0;
+        xout = NaN(1, vector_length);  % Return consistent dimensions with NaN
         return
     end
 
@@ -150,18 +180,37 @@ while true
     
     if length(TSPAN) ~= 2
         %evaluate at the points in TSPAN and return
-        tau = -(TSPAN(end)-TSPAN(1))/(TSPAN(end)+TSPAN(1)) +2*(TSPAN)/(TSPAN(end)-TSPAN(1));
-        tout = TSPAN;
-        T = cos((0:N)'.*acos(tau))'; %length(tau)xN+1
-        xout_ = T * bi;
+        %find the relevant timespan
+        relevantTSPAN = TSPAN(TSPAN <= tend & TSPAN >= tstart);
+        if isempty(relevantTSPAN)
+            %firstpos = lastpos;
+            tstart = tend;
+            tend = tstart+Sec;
+    
+            if tend > TSPAN(end)
+                tend = TSPAN(end);
+                lastrunflag = true;
+            end
+            X0 = xnew(end,:);
+            xinit = repmat(X0,[length(tau),1]); %innitial guess
+            X0 = [X0;zeros(N,length(X0))];
+
+            continue
+        end
+        
+        tau_ = -1 +2*(relevantTSPAN-tstart)/(tend-tstart);
+        lastpos = firstpos + length (relevantTSPAN);
+        tout(firstpos:lastpos-1) = relevantTSPAN;
+        T_ = cos((0:N)'.*acos(tau_))'; %length(tau)xN+1
+        xout_ = T_ * bi;
+        xout(firstpos:lastpos-1,:) = xout_;
     else
         lastpos = firstpos+N;
         tout(firstpos:lastpos) = tstart + (tau+1)*(tend-tstart)/2;
-        xout_ = xnew;
+        %xout_ = xnew;
+        xout(firstpos:lastpos,:) = xnew;
     end
-    
-    
-    xout(firstpos+1:lastpos,:) = xout_(2:end,:);
+     
     if outputmodel
         model.bi(model_counter,:,:) = bi;
         model_counter = model_counter+1;
@@ -178,7 +227,7 @@ while true
         tend = TSPAN(end);
         lastrunflag = true;
     end
-    X0 = xout_(end,:);
-    xtinit = repmat(X0,[length(tau),1]); %innitial guess
+    X0 = xnew(end,:);
+    xinit = repmat(X0,[length(tau),1]); %innitial guess
     X0 = [X0;zeros(N,length(X0))];
 end
