@@ -1,19 +1,19 @@
 function [a,e,i,O,w,f] = kep_elements(r,v,mu)
-%%function [a,e,i,O,w,f] = kep_elements(r,v,mu)
-%extracts the keplerian orbital elements of a known position and velocity
-%in the ECI system
-%THIS FUNCTION WORKS ON TWO SINGLE LINE 1x3 VECTORS!!!
-% Inputs:
-%   r  - position vector [km] (1×3)
-%   v  - velocity vector [km/s] (1×3)
-%   mu - gravitational parameter [km³/s²]
-% Outputs:
-%   a - semi-major axis [km]
-%   e - eccentricity [-]
-%   i - inclination [rad]
-%   O - RAAN (right ascension of ascending node) [rad]
-%   w - argument of periapsis [rad]
-%   f - true anomaly [rad]
+%KEP_ELEMENTS  Classical Keplerian orbital elements from position and velocity.
+%   [a,e,i,O,w,f] = KEP_ELEMENTS(r, v, mu) converts an ECI state to classical
+%   orbital elements. Operates on single 1x3 position/velocity vectors.
+%
+%   Inputs:
+%     r  - position vector [km] (1x3)
+%     v  - velocity vector [km/s] (1x3)
+%     mu - gravitational parameter [km^3/s^2]
+%   Outputs:
+%     a - semi-major axis [km]
+%     e - eccentricity [-]
+%     i - inclination [rad]
+%     O - RAAN (right ascension of ascending node) [rad]
+%     w - argument of periapsis [rad]
+%     f - true anomaly [rad]
 
 %% known vectors:
 %ECI reference frame

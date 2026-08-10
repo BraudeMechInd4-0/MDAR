@@ -1,7 +1,7 @@
 function [tout,xout,errorOutput,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
-%[tout,xout,error] = odeMPCI(ODEFUN, TSPAN,X0)
-%[tout,xout,error] = odeMPCI(ODEFUN, TSPAN,X0,options)
-%[tout,xout,error,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
+%[t,x,err] = odeMPCI(ODEFUN, TSPAN,X0)
+%[t,x,err] = odeMPCI(ODEFUN, TSPAN,X0,options)
+%[tout,xout,errorOutput,model] = odeMPCI(ODEFUN, TSPAN, X0,options)
 %Bai's [1] MPCI integration method, as described in [2]
 % Useage
 %       ODEFUN - the function to integrate (the f in the equation dx/dt = f(x,t))
@@ -126,7 +126,7 @@ while true
     eRel = inf;
     i = 0;
     while (eAbs  > AbsTol || eRel > RelTol) && i<2000
-        F = ODEFUN(om2.*tau+om1,xold); 
+        F = ODEFUN(om2.*tau+om1,xold); % the VMPCM uses F = ode(input{:}).*omega2; because dx/dtau = dx/dt.dtau/dt, but APC seemed to have accounted for that in the next line
         P1 = om2*(eye(N+1) - L) * S;
         bi = X0 + P1 * A * F;
         xnew = T*bi;

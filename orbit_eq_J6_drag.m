@@ -1,6 +1,19 @@
 function [dr] = orbit_eq_J6_drag(t,r,mu1,CD,A,m,Re,J)
-%% function [dr] = orbit_eq_J6_drag(t,r,mu,CD,A,m,Re,J)
-% definition of orbit eq with J2-J6 and drag
+%ORBIT_EQ_J6_DRAG  Equations of motion: J2-J6 zonal harmonics + atmospheric drag.
+%   dr = ORBIT_EQ_J6_DRAG(t, r, mu1, CD, A, m, Re, J) returns the state derivative
+%   for a spacecraft under Earth gravity with zonal harmonics J2 through J6 and drag.
+%
+%   Inputs:
+%     t   - time [s] (ODE-solver argument)
+%     r   - state [rx ry rz vx vy vz] (6xN column-wise, or Nx6 row-wise)
+%     mu1 - Earth gravitational parameter [km^3/s^2]
+%     CD  - drag coefficient
+%     A   - cross-sectional area [km^2]
+%     m   - spacecraft mass [kg]
+%     Re  - Earth radius [km]
+%     J   - zonal harmonic coefficients [J1..J6] (J1 = 0)
+%   Outputs:
+%     dr  - state derivative, same shape as r
 
 
 % d^2r/dt = -mu*r/norm(r);
@@ -55,11 +68,12 @@ if n == 6
     aj5 = (3*J(5)*mu1*Re^5)./(8*normr9).*[...
         r(1,:).*r31.*(35-210*r32tonormr2+231*r34tonormr4),...
         r(2,:).*r31.*(35-210*r32tonormr2+231*r34tonormr4),...
-        r32.*(105-315*r32tonormr2+231*r34tonormr4)-(15*J(5)*mu1*Re^5)./(8*normr7)]';
+        r32.*(105-315*r32tonormr2+231*r34tonormr4)-(15*J(4)*mu1*Re^5)./(8*normr7)]';
     aj6 = -(J(6)*mu1*Re^6)./(16*normr9).*[...
-        r(1,:).*(35-945*r32tonormr2+3465*r34tonormr4-3003*r36tonormr6),...
-        r(2,:).*(35-945*r32tonormr2+3465*r34tonormr4-3003*r36tonormr6),...
+        r(1,:).*(35-945*r32tonormr2+3465*r34tonormr4)-3003*r36tonormr6,...
+        r(2,:).*(35-945*r32tonormr2+3465*r34tonormr4)-3003*r36tonormr6,...
         r(3,:).*(245-2205*r32tonormr2+4851*r34tonormr4-3003*r36tonormr6)]';
+    % ad = zeros(size(aj2));
     le = normr.^3;
 
     dr(1,:) = r(4,:);
@@ -110,11 +124,12 @@ elseif M == 6
     aj5 = (3*J(5)*mu1*Re^5)./(8*normr9).*[...
         r(:,1).*r31.*(35-210*r32tonormr2+231*r34tonormr4),...
         r(:,2).*r31.*(35-210*r32tonormr2+231*r34tonormr4),...
-        r32.*(105-315*r32tonormr2+231*r34tonormr4)-(15*J(5)*mu1*Re^5)./(8*normr7)];
+        r32.*(105-315*r32tonormr2+231*r34tonormr4)-(15*J(4)*mu1*Re^5)./(8*normr7)];
     aj6 = -(J(6)*mu1*Re^6)./(16*normr9).*[...
-        r(:,1).*(35-945*r32tonormr2+3465*r34tonormr4-3003*r36tonormr6),...
-        r(:,2).*(35-945*r32tonormr2+3465*r34tonormr4-3003*r36tonormr6),...
+        r(:,1).*(35-945*r32tonormr2+3465*r34tonormr4)-3003*r36tonormr6,...
+        r(:,2).*(35-945*r32tonormr2+3465*r34tonormr4)-3003*r36tonormr6,...
         r(:,3).*(245-2205*r32tonormr2+4851*r34tonormr4-3003*r36tonormr6)];
+    % ad = zeros(size(aj2));
     le =normr.^3;
 
     dr(:,1) = r(:,4);
