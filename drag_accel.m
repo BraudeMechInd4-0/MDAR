@@ -1,17 +1,17 @@
 function [ad] = drag_accel(x,CD,A,m,Re)
-%A function that computes the acceleration contribution due to drag
-% Uses exponential atmospheric density model from Vallado (2022),Table
-% 8-4:  U.S. Standard Atmosphere + CIRA-72
-%Usage:
-%   function [ad] = drag_accel(x,CD,A,m)
-%     Inputs:
-%       x - the curent state [rx ry rz vx vy vz]
-%       CD - drag coeeficient
-%       A - cross section of satellite
-%       m - satellite mass
-%       Re - earth's radius
-%     Outputs:
-%       ad - drag acceleration vector [km/s²] (N×3)
+%DRAG_ACCEL  Atmospheric drag acceleration (exponential density model).
+%   ad = DRAG_ACCEL(x, CD, A, m, Re) returns the drag acceleration for each row of
+%   the state x, using the exponential atmospheric density model from Vallado (2022),
+%   Table 8-4 (U.S. Standard Atmosphere + CIRA-72).
+%
+%   Inputs:
+%     x  - state(s) [rx ry rz vx vy vz], one row per point (N x 6) [km, km/s]
+%     CD - drag coefficient
+%     A  - cross-sectional area [km^2]
+%     m  - mass [kg]
+%     Re - Earth radius [km]
+%   Outputs:
+%     ad - drag acceleration vector(s) (N x 3) [km/s^2]
 
 v = x(:,4:6);
 r = x(:,1:3);
@@ -20,10 +20,11 @@ vnorm = sqrt(sum(v.^2,2));
 ad = zeros(size(x,1),3);
 
 h = rnorm - Re;
-if any(h < 100)
-%    warning("Satellite decayed!")
-end
 
+if any(h < 100)
+    warning("Satellite decayed!")
+end
+h(h<=0) = 0;
 [h0,r0,H] = expDens(h);
 rho = r0.*exp(-(h-h0)./H)*1e9;%kg/km^3
 ad = -0.5*CD*A/m*rho.*vnorm.*v; 
@@ -107,7 +108,7 @@ else
         r0 = 3.845e-9;
         H = 16.149;
     elseif h>130 && h<=140
-        h0 = 130; 
+        h0 = 130;
         r0 = 8.484e-9;
         H = 12.636;
     elseif h>120 && h<=130

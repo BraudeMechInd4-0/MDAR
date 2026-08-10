@@ -1,93 +1,97 @@
-
-function [offspring1, offspring2] = SBX(parent1, parent2, CrossOverRate, Limits)
-%SBX Simulated Binary Crossover for real-valued vectors.
-% Inputs:
-%   parent1, parent2  - real-valued row/column vectors (same length)
-%   CrossOverRate     - probability of applying SBX (0..1)
-%   Limits            - [yl yu] lower/upper bounds for each gene
-% Outputs:
-%   offspring1, offspring2 - SBX children (clamped to [yl,yu])
+function [offspring1, offspring2] = SBX(parent1,parent2,CrossOverRate,Limits)
+%SBX  Simulated Binary Crossover for real-valued vectors.
+%   [offspring1,offspring2] = SBX(parent1, parent2, CrossOverRate, Limits) applies
+%   simulated binary crossover to a pair of real-valued vectors (here the maneuver
+%   wait times), producing children clamped to the given bounds.
 %
-% Notes:
-%   - Distribution index mu (a.k.a. eta_c) controls spread (larger = closer to parents).
-%   - If crossover not applied, parents are returned unchanged.
+%   Inputs:
+%     parent1, parent2 - real-valued vectors of equal length
+%     CrossOverRate    - probability of applying SBX (0..1)
+%     Limits           - [yl yu] lower/upper bounds applied to every gene
+%   Outputs:
+%     offspring1, offspring2 - SBX children, clamped to [yl,yu]
+%
+%   Note: the distribution index mu (eta_c, default 20) controls the spread;
+%   larger values keep children closer to the parents. If crossover is not applied
+%   the parents are returned unchanged.
 
-    mu = 20;                                  % SBX distribution index
-    offspring1 = parent1;                     % default: copy parents
-    offspring2 = parent2;
+mu = 20;
+offspring1 = parent1;
+offspring2 = parent2;
+if rand(1) <= CrossOverRate
 
-    % If crossover not triggered, return clones
-    if rand(1) > CrossOverRate || isempty(parent1)
-        return
-    end
-
-    yl = Limits(1);                           % lower bound
-    yu = Limits(2);                           % upper bound
-
-    % Preallocate children
-    child1 = zeros(size(parent1));
-    child2 = zeros(size(parent2));
-
-    % Gene-wise SBX
-    for j = 1:length(parent2)
+    yl = Limits(1);
+    yu = Limits(2);
+    for j = 1 : length(parent2)
         par1 = parent1(j);
         par2 = parent2(j);
-
-        if rand(1) <= 0.5                      % with prob 0.5 perform SBX on this gene
-            if abs(par1 - par2) > 1e-6         % only if parents differ
-                % Sort endpoints (y1 <= y2)
+        rnd = rand(1);
+        if rnd <= 0.5
+            if abs(par1 - par2) > 0.000001
                 if par2 > par1
-                    y1 = par1; y2 = par2;
+                    y2 = par2;
+                    y1 = par1;
                 else
-                    y1 = par2; y2 = par1;
+                    y2 = par1;
+                    y1 = par2;
                 end
-
-                % Compute beta (distance to bounds), then alpha
                 if (y1 - yl) > (yu - y2)
-                    beta = 1 + 2*(yu - y2)/(y2 - y1);
+                    beta = 1 + (2*(yu - y2)/(y2 - y1));
                 else
-                    beta = 1 + 2*(y1 - yl)/(y2 - y1);
+                    beta = 1 + (2*(y1 - yl)/(y2 - y1));
                 end
-                beta  = 1 / beta;
-                alpha = 2 - beta^(mu + 1);
-
-                % Sample spread factor betaq
-                r = rand(1);
-                if r <= 1/alpha
-                    betaq = (r*alpha)^(1/(mu + 1));
+                expp = mu + 1;
+                beta = 1/beta;
+                alpha = 2 - beta^expp;
+                rnd = rand(1);
+                if rnd <= 1/alpha
+                    alpha = alpha*rnd;
+                    expp = 1/(mu + 1);
+                    betaq = alpha^expp;
                 else
-                    betaq = (1/(2 - r*alpha))^(1/(mu + 1));
-                end
+                    alpha = alpha*rnd;
+                    alpha = 1/(2 - alpha);
+                    expp = 1/(mu + 1);
+                    betaq = alpha^expp;
 
-                % Create symmetric children around mid-point
+                end
                 child1(j) = 0.5*((y1 + y2) - betaq*(y2 - y1));
                 child2(j) = 0.5*((y1 + y2) + betaq*(y2 - y1));
             else
-                % Parents equal: children equal to parents
-                y1 = par1; y2 = par2;
-                child1(j) = 0.5*((y1 + y2) - (y2 - y1));
-                child2(j) = 0.5*((y1 + y2) + (y2 - y1));
+                betaq = 1;
+                y1 = par1;
+                y2 = par2;
+                child1(j) = 0.5*((y1 + y2) - betaq*(y2 - y1));
+                child2(j) = 0.5*((y1 + y2) + betaq*(y2 - y1));
             end
-
-            % Clamp to bounds
-            if child1(j) < yl, child1(j) = yl; end
-            if child2(j) < yl, child2(j) = yl; end
-            if child1(j) > yu, child1(j) = yu; end
-            if child2(j) > yu, child2(j) = yu; end
+            if child1(j) < yl
+                child1(j) = yl;
+            end
+            if child2(j) < yl
+                child2(j) = yl;
+            end
+            if child1(j) > yu
+                child1(j) = yu;
+            end
+            if child2(j) > yu
+                child2(j) = yu;
+            end
         else
-            % No per-gene crossover: copy parents on this locus
             child1(j) = par1;
             child2(j) = par2;
         end
-
-        % Numerical safety (should not trigger under normal conditions)
-        if ~isreal(child1(j)) || ~isreal(child2(j))
-            % Fall back to uniform within bounds for any invalid gene
-            if ~isreal(child1(j)), child1(j) = rand(1)*(yu - yl) + yl; end
-            if ~isreal(child2(j)), child2(j) = rand(1)*(yu - yl) + yl; end
+        if ~isreal(child1) || ~isreal(child2)
+            disp('error in ga rep sbx');
+            if ~isreal(child1)
+                child1(j) = rand(1)*(yu - yl) + yl;
+            end
+            if ~isreal(child2)
+                child2(j) = rand(1)*(yu - yl) + yl;
+            end
         end
     end
-
-    offspring1 = child1;                       % assign results
+    offspring1 = child1;
     offspring2 = child2;
+
+else
 end

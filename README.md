@@ -1,231 +1,228 @@
 # Bi-level Evolutionary Framework for Multi-Debris Active Removal
 
-This repository contains the implementation code for the paper:
+This repository contains the implementation code for two papers on bi-level optimization for
+Multi-Debris Active Removal (MDAR) mission design — a **single-objective** framework and its
+**multi-objective** extension. Both share one code base; the entry point you run selects which.
 
-Elad Denenberg, Adham Salih, **"Bi-level Evolutionary Framework for Designing Multi-Debris Active Removal Missions"**,
-Acta Astronautica, Volume 246, 2026, Pages 247-257, ISSN 0094-5765,
+**Paper 1 — single-objective (published):**
+Elad Denenberg, Adham Salih, **"Bi-level Evolutionary Framework for Designing Multi-Debris Active
+Removal Missions"**, Acta Astronautica, Volume 246, 2026, Pages 247-257, ISSN 0094-5765,
 https://doi.org/10.1016/j.actaastro.2026.04.002.
+
+**Paper 2 — multi-objective (submitted):**
+Adham Salih, Elad Denenberg, **"Multi-objective Bi-level Optimization Framework for Designing
+Multi-Debris Active Removal Missions"**, submitted to Acta Astronautica.
 
 ---
 
 ## Overview
 
-This framework implements a bi-level evolutionary optimization approach for Multi-Debris Active Removal (MDAR) mission design. The framework supports:
+A bi-level evolutionary optimization approach for MDAR mission design. An **upper level** searches the
+debris visiting sequence and maneuver timing; a **lower level** resolves each transfer's trajectory
+(Δv) with realistic dynamics. The framework supports:
 
-- **High-fidelity force models**: Zonal harmonics up to J6 and atmospheric drag
-- **Bi-level optimization**: Upper level (debris sequence + timing) and lower level (trajectory parameters)
-- **Multiple low-level optimizers**: Random search, Genetic Algorithm (GA), and CMA-ES
-- **Direct transfer architecture**: Proof-of-concept on Iridium-33 debris cloud
+- **Single-objective (paper 1):** weighted-sum fitness (removed mass vs. total Δv), with three
+  interchangeable lower-level optimizers — Random search, Genetic Algorithm (GA), and CMA-ES.
+- **Multi-objective (paper 2):** an NSGA-II upper level returning the Pareto front of the two
+  objectives — **maximize removed mass** and **minimize total Δv**.
+- **High-fidelity force models:** zonal harmonics through J6 and atmospheric drag; the multi-objective
+  runs additionally include **solar radiation pressure (SRP) and lunar third-body** perturbations.
+- **Perturbed-Lambert lower level:** Thompson's perturbed-Lambert method (`prtlambertT`) integrated
+  with a Modified Picard-Chebyshev propagator.
+- **Scenarios:** the Iridium-33 debris cloud and a synthetic cloud.
 
 ---
 
 ## MATLAB Requirements
 
 - MATLAB R2020b or later
-- Parallel Computing Toolbox (optional, for faster computation)
+- Parallel Computing Toolbox (optional, for faster computation — the lower level uses `parfor`)
 
 ---
 
 ## Installation
 
-### 1. Clone the Repository
-
+### 1. Clone the repository
 ```bash
 git clone https://github.com/BraudeMechInd4-0/MDAR.git
 cd MDAR
 ```
 
-### 2. Initialize Submodules
+### 2. Initialize submodules
+The project uses two submodules (see `.gitmodules`):
+- `ParseGP/` — TLE / GP catalog parsing utilities (small)
+- `fundamentals-of-astrodynamics/` — Vallado's astrodynamics library (provides the Lambert seed
+  `lambertb` and related utilities)
 
-This project requires several submodules for parsing, orbital mechanics utilities, and Lambert solvers:
+The Vallado repository is **very large** — it ships C++/Python/Fortran sources, STK data, and test
+datasets we don't need. Use a **sparse checkout** to pull only its MATLAB sources
+(`software/matlab/`). Requires **Git 2.25+** (on Windows, run these in **Git Bash**):
 
-The required submodules are:
-- `ParseGP/` - TLE parsing utilities
-- `vallado/` - Vallado's astrodynamics utilities (includes Lambert solvers)
-
-Add them using
 ```bash
-git submodule add https://github.com/eladden/ParseGP.git
-git submodule add https://github.com/CelesTrak/fundamentals-of-astrodynamics.git
+# ParseGP is small — initialize it normally
+git submodule update --init ParseGP
+
+# Vallado — register without checking out, then sparse-checkout only the MATLAB sources
+git submodule update --init --no-checkout fundamentals-of-astrodynamics
+cd fundamentals-of-astrodynamics
+git sparse-checkout init --cone
+git sparse-checkout set software/matlab
+git checkout
+cd ..
 ```
+
+This leaves only `fundamentals-of-astrodynamics/software/matlab/` on disk — which the scripts add to
+the path via `addpath(genpath("fundamentals-of-astrodynamics"))`. (The `Satellites/` folder ships
+with the repo and holds the Iridium-33 TLE data; it is not a submodule.)
 
 ---
 
 ## Usage
 
-### Step 1: Generate Debris Propagation Models
-
-Before running optimization, you must generate Chebyshev propagation models for the debris cloud:
-
+### Step 1 — Generate debris propagation models
+Before any optimization, build the fast Chebyshev propagation models for the debris cloud:
 ```matlab
 createModelsScript
 ```
+Parses the catalog, integrates each object under the selected force model, fits Chebyshev
+polynomials, and saves the models under `models/`. This step can take minutes to hours depending on
+cloud size and mission horizon.
 
-**What this does:**
-- Parses TLE data from `Satellites/Iridium.xml` using ParseGP utilities
-- Generates initial states (positions, velocities, masses, cross-sections) for debris
-- Integrates debris trajectories using J6+drag dynamics over 2-year mission horizon
-- Fits Chebyshev polynomials for fast propagation
-- Saves models to `Satellites/Iridium33Model.mat`
+### Step 2 — Run an optimizer (pick one)
 
-**Requirements:**
-- TLE data file: `Satellites/Iridium.xml` (Iridium-33 debris cloud)
-- Reference epoch and duration are configurable in the script
+**Multi-objective (paper 2):**
+```matlab
+MDAR_NSGAII_main
+```
+NSGA-II upper level, two objectives (removed mass, total Δv). Runs the Iridium-33 and synthetic-cloud
+scenarios under the J6+Drag+SRP+Moon force model, repeated for statistical pooling into a reference
+Pareto front. Saves per-run results (non-dominated set + per-generation logs).
 
-**Note:** This step may take several minutes to hours depending on debris count and mission duration.
-
-### Step 2: Run Bi-level Optimization
-
-Execute the main optimization framework:
-
+**Single-objective (paper 1):**
 ```matlab
 HiLevel
 ```
+Weighted-sum fitness with a selectable lower-level optimizer (`LowLevelType = "Rand" | "GA" | "CMA"`).
 
-**What this does:**
-- Loads pre-computed models from `Satellites/Iridium33Model.mat`
-- Runs bi-level evolutionary optimization with three low-level solver types:
-  - Random search
-  - Genetic Algorithm (GA)
-  - CMA-ES (Covariance Matrix Adaptation Evolution Strategy)
-- Performs 3 independent runs per solver type
-- Saves results to files: `Run1Rand.mat`, `Run1GA.mat`, `Run1CMA.mat`, etc.
+**Weighted-sum sweep baseline (paper 2 comparison):**
+```matlab
+HiLevelVaringM
+```
+Sweeps the objective weights to trace a front via scalarization.
 
-**Key parameters** (configurable in `HiLevel.m`):
-- `PopSizeHi = 30` - High-level population size
-- `MaxGenHi = 50` - Number of generations
-- `NtoRemove = 10` - Number of debris to remove
-- `T1Max = 2*60*60*24*30` - Maximum wait time between maneuvers (≈60 days)
-- `wM = 1` - Weight for removed mass
-- `wDV = 8` - Weight for total ΔV
+**Key upper-level parameters** (editable at the top of each main): `PopSizeHi`, `MaxGenHi`,
+`NtoRemove`, `T1Max` (max inter-maneuver wait), and — single-objective only — the weights `wM`, `wDV`.
 
 ---
 
-## Repository Structure
+## Reproducing paper 1 (original single-objective results)
+
+Paper 1 used the **J6+drag** force model and the original Battin/Thompson Lambert settings. The shipped
+code standardizes on the newer physics and the consolidated `prtlambertT` solver, so to reproduce the
+paper-1 numbers:
+
+1. **Force model** — in the lower-level optimizers use `orbit_eq_J6_drag` instead of
+   `orbit_eq_J6_drag_SRP_moon`. `LowLevelOptimizationGA` and `LowLevelOptimizationCMA` already use
+   `orbit_eq_J6_drag`; change the handle in `LowLevelOptimizationRandom` to match.
+2. **Solver settings** — set `options.maxIter = 20;` and `options.delta = 8;` in the lower-level
+   evaluators (`options.Tolr = 1e-5` is already the default). With these, `prtlambertT` reproduces the
+   behavior of the original `prtlambertbf` solver (same Thompson algorithm; the newer defaults are 100
+   iterations / `delta` 16).
+
+---
+
+## Repository structure
 
 ```
 .
-├── HiLevel.m                          # Main optimization script
-├── createModelsScript.m               # Model generation script
+├── MDAR_NSGAII_main.m        # Paper 2: multi-objective (NSGA-II) main
+├── HiLevel.m                 # Paper 1: single-objective main (Rand/GA/CMA)
+├── HiLevelVaringM.m          # Weighted-sum sweep baseline
+├── createModelsScript.m      # Debris propagation-model generation
 │
-├── High-Level GA Components/
-│   ├── initPopHi.m                    # Population initialization
-│   ├── EvaluateHi.m                   # High-level evaluation
-│   ├── tournamentSelection.m          # Selection operator
-│   ├── CrossOver.m                    # Crossover coordinator
-│   ├── Crossover_Ordered_Operator.m   # Ordered crossover (OX)
-│   ├── Mutation.m                     # Mutation coordinator
-│   ├── PolyMutation.m                 # Polynomial mutation
-│   ├── ExchangeMutation.m             # Exchange mutation
-│   ├── EliteProcedure.m               # Elitism handling
-│   └── SBX.m                          # Simulated binary crossover
+├── Upper-level operators/
+│   ├── initPopHi.m           # Population initialization
+│   ├── EvaluateHi.m          # Single-objective evaluation
+│   ├── EvaluateHiVarM.m      # Multi-objective (varying-mass) evaluation
+│   ├── tournamentSelection.m, SelectionByRank.m        # selection (SO / NSGA-II)
+│   ├── CrossOver.m, Crossover_Ordered_Operator.m, SBX.m # crossover
+│   ├── Mutation.m, PolyMutation.m, ExchangeMutation.m   # mutation
+│   ├── EliteProcedure.m, EliteFullSorting.m             # elitism (SO / NSGA-II)
+│   ├── NDSort.m, CrowdingDistance.m, CalcRankAndDistance.m  # NSGA-II ranking (PlatEMO)
 │
-├── Low-Level Optimizers/
-│   ├── LowLevelOptimizationRandom.m   # Random search
-│   ├── LowLevelOptimizationGA.m       # GA optimizer
-│   └── LowLevelOptimizationCMA.m      # CMA-ES optimizer
+├── Lower-level optimizers/
+│   ├── LowLevelOptimizationRandom.m, LowLevelOptimizationGA.m,
+│   │   LowLevelOptimizationCMA.m, LowLevelOptimizationOneVar.m
+│   └── EvaluateModel.m       # per-leg cost evaluation
 │
-├── Orbital Mechanics/
-│   ├── orbit_eq_J6_drag.m             # J6+drag dynamics
-│   ├── orbit_eq_J2_drag.m             # J2+drag dynamics
-│   ├── prtlambertbf.m                 # Perturbed Lambert solver
-│   ├── hitearth.m                     # Earth collision detection
-│   ├── odeMPCI.m                      # Modified Picard-Chebyshev integrator
-│   ├── propCheb.m                     # Chebyshev propagation
-│   ├── kep_elements.m                 # Keplerian element conversion
-│   └── drag_accel.m                   # Atmospheric drag model
+├── Orbital mechanics/
+│   ├── orbit_eq_J6_drag_SRP_moon.m  # J6 + drag + SRP + Moon (paper 2)
+│   ├── orbit_eq_J6_drag.m, orbit_eq_J2_drag.m  # J6/J2 + drag
+│   ├── drag_accel.m, moon_v.m, sun_v.m         # perturbation models / ephemerides
+│   ├── prtlambertT.m, prtlambertTRB.m, prtlambertMPS.m, prtlambertMPSRB.m  # Lambert solvers
+│   ├── odeMPCI.m, odeMPCIrev.m  # Modified Picard-Chebyshev integrators (forward / backward)
+│   ├── propCheb.m, kep_elements.m, hitearth.m
 │
 └── Submodules/
-    ├── ParseGP/                       # TLE parsing
-    ├── Satellites/                    # Debris data (.mat files)
-    └── vallado/                       # Astrodynamics utilities (Lambert, etc.)
+    ├── ParseGP/                        # TLE / GP parsing
+    └── fundamentals-of-astrodynamics/  # Vallado astrodynamics utilities
 ```
 
 ---
 
-## Data Files
+## Data files
 
-### Required Input Data
-
-**`Satellites/Iridium.xml`** - TLE data for Iridium-33 debris cloud
-- Standard XML format from space-track.org or similar sources
-- Parsed automatically by `generateList()` function in ParseGP utilities
-
-### Generated Output Files
-
-- **`Satellites/Iridium33Model.mat`** - Pre-computed Chebyshev propagation models
-  - Generated by `createModelsScript.m`
-  - Contains: `model` structure with Chebyshev coefficients and time segments
-- **`Run<N><Type>.mat`** - Optimization results for each run and solver type
-  - Contains: `BestSol`, `wDV`, `wM`, `LowLevelType`, `GenParam`
+- **`Satellites/Iridium.xml`** — Iridium-33 TLE data (parsed by ParseGP).
+- **`models/*.mat`** — generated Chebyshev propagation models (produced by `createModelsScript.m`;
+  gitignored — regenerate locally, do not commit).
+- **Run outputs** (`*Run*.mat`, `*VM_MO_*.mat`) — per-run results (best/non-dominated solutions plus
+  logs); gitignored.
 
 ---
 
-## Key Features
+## Citations
 
-### Force Model
-- **Zonal harmonics**: J2 through J6 (Earth oblateness)
-- **Atmospheric drag**: Exponential density model (Vallado 2022, Table A.6)
-- **Extensible**: Framework supports additional perturbations (SRP, third-body)
+If you use this code, please cite the relevant work:
 
-### Optimization Framework
-- **Bi-level structure**: Decouples sequence planning from trajectory optimization
-- **Modular design**: Easy to swap low-level optimizers
-- **Realistic dynamics**: No analytical approximations during optimization
+**Framework (paper 1, single-objective):**
+Elad Denenberg, Adham Salih, "Bi-level Evolutionary Framework for Designing Multi-Debris Active
+Removal Missions," Acta Astronautica, 246 (2026) 247-257. https://doi.org/10.1016/j.actaastro.2026.04.002
 
-### Mission Architecture
-- **Direct transfer**: Impulsive maneuvers between debris
-- **Bi-impulse transfers**: Departure + arrival velocity matching
-- **Flexible timing**: Optimizes wait times between maneuvers
+**Framework (paper 2, multi-objective):**
+Adham Salih, Elad Denenberg, "Multi-objective Bi-level Optimization Framework for Designing
+Multi-Debris Active Removal Missions," submitted to Acta Astronautica.
 
----
+**Perturbed-Lambert solvers** (`prtlambertT`, `prtlambertTRB`, `prtlambertMPS`, `prtlambertMPSRB`,
+`odeMPCIrev`):
+Elad Denenberg, "Improved Convergence and Efficiency of Perturbed Lambert Solvers via Backward
+Chebyshev-Picard Integration," in review, Advances in Space Research.
 
-## Computational Notes
-
-- **Parallel evaluation**: Low-level optimizers use `parfor` (requires Parallel Computing Toolbox)
-- **Runtime**: Full 3×3 runs (3 solvers × 3 repetitions) may take several hours
-- **Memory**: Pre-computing models requires sufficient RAM (~1-2 GB for 98 debris over 2 years)
+**NSGA-II ranking utilities** (`NDSort`, `CrowdingDistance`):
+Ye Tian, Ran Cheng, Xingyi Zhang, and Yaochu Jin, "PlatEMO: A MATLAB platform for evolutionary
+multi-objective optimization [educational forum]," IEEE Computational Intelligence Magazine, 2017,
+12(4): 73-87.
 
 ---
 
-## Citation
+## Acknowledgments / third-party components
 
-If you use this code in your research, please cite:
-
-```bibtex
-@article{denenberg2025mdar,
-  title={Bi-level Evolutionary Framework for Designing Multi-Debris Active Removal Missions},
-  author={Denenberg, Elad and Salih, Adham},
-  journal={Acta Astronautica},
-  year={2026},
-  note={In press}
-}
-```
-
-*(Citation details will be updated upon publication)*
+- **PlatEMO** (Tian et al., 2017) — non-dominated sorting and crowding distance (`NDSort`,
+  `CrowdingDistance`).
+- **Vallado's astrodynamics utilities** (Vallado, 2022) — via the `fundamentals-of-astrodynamics`
+  submodule (Lambert seed, etc.).
+- **Modified Picard-Chebyshev Integration** (Woollands & Junkins, 2019; Bai & Junkins, 2011).
+- The multi-objective force model (`orbit_eq_J6_drag_SRP_moon`, `moon_v`, `sun_v`) and the
+  perturbed-Lambert solvers are the work of E. Denenberg.
 
 ---
 
 ## License
 
-[Add your license here]
+Distributed under the **GNU Affero General Public License v3.0** — see [`LICENSE`](LICENSE).
 
 ---
 
 ## Contact
 
-For questions or issues, please contact:
-- Elad Denenberg: eladd@braude.ac.il
-- Adham Salih: adhamsalih@braude.ac.il
-
----
-
-## Acknowledgments
-
-This research uses:
-- Modified Picard-Chebyshev Integration (Woollands & Junkins, 2019; Bai & Junkins, 2011)
-- Perturbed Lambert solver (Thompson et al., 2018)
-
-- Vallado's astrodynamics utilities (Vallado, 2022)
-
-- Mostapha Kalami Heris, Yarpiz Evolutionary Algorithms Toolbox for MATLAB (YPEA), Yarpiz, 2020.
+- Elad Denenberg — eladd@braude.ac.il
+- Adham Salih — adhamsalih@braude.ac.il

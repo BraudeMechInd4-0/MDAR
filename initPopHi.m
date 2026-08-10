@@ -1,22 +1,25 @@
-function Population = initPopHi(PopSizeHi, NumofDeb, NtoRemove, T1Max)
-%INITPOPHI Initialize high-level GA population
-% Inputs:
-%   PopSizeHi  - number of individuals in the population
-%   NumofDeb   - total number of debris items available
-%   NtoRemove  - number of debris to select per individual
-%   T1Max      - maximum waiting time between maneuvers [s]
-% Output:
-%   Population - struct array with fields:
-%                .Order            -> permutation of selected debris IDs
-%                .WaitUntilManuver -> random wait times between maneuvers
-
-    %--- Preallocate struct array for efficiency ---
-    Population(PopSizeHi).Order = [];
-    Population(PopSizeHi).WaitUntilManuver = [];
-
-    %--- Generate each individual ---
-    for i = 1:PopSizeHi
-        Population(i).Order = randperm(NumofDeb, NtoRemove);      % Random debris order
-        Population(i).WaitUntilManuver = rand(NtoRemove-1, 1) * T1Max; % Random wait times
+function Population = initPopHi(PopSizeHi,NumofDeb,mode,NtoRemove,T1Max)
+%INITPOPHI  Initialize the upper-level (high-level) population.
+%   Population = INITPOPHI(PopSizeHi, NumofDeb, mode, NtoRemove, T1Max) creates a
+%   random initial population of removal plans (a debris visiting order plus the
+%   maneuver wait times).
+%
+%   Inputs:
+%     PopSizeHi - number of individuals in the population
+%     NumofDeb  - total number of debris objects available
+%     mode      - wait-time initialization: 1 -> random wait times in [0,T1Max];
+%                 any other value leaves .WaitUntilManuver empty (set by the caller)
+%     NtoRemove - number of debris selected per individual
+%     T1Max     - maximum wait time between maneuvers [s]
+%   Outputs:
+%     Population - struct array with fields:
+%                    .Order            - permutation of NtoRemove debris IDs
+%                    .WaitUntilManuver - (NtoRemove-1)x1 wait times (if mode==1)
+Population(PopSizeHi).Order = [];
+Population(PopSizeHi).WaitUntilManuver = [];
+for i = 1 : PopSizeHi
+    Population(i).Order = randperm(NumofDeb,NtoRemove);
+    if mode == 1
+        Population(i).WaitUntilManuver = rand(NtoRemove-1,1)*T1Max;
     end
 end

@@ -1,32 +1,30 @@
+function PopulationSelect = tournamentSelection(Population,Ifmax)
+%TOURNAMENTSELECTION  Binary tournament selection on scalar fitness.
+%   PopulationSelect = TOURNAMENTSELECTION(Population, Ifmax) builds a mating pool
+%   the same size as the input by repeated binary tournaments on the .fit field.
+%
+%   Inputs:
+%     Population - struct array with field .fit (scalar fitness)
+%     Ifmax      - 1 to keep the higher-fitness candidate, 0 to keep the lower
+%   Outputs:
+%     PopulationSelect - selected population (same size as input)
+PopSize = length(Population);
+for n = 1 : PopSize
+    s = randi(PopSize,2,1);
+    if ~Ifmax
 
-function PopulationSelect = tournamentSelection(Population, Ifmax)
-%TOURNAMENTSELECTION Select individuals using binary tournament.
-% Inputs:
-%   Population - struct array with field .fit (fitness value)
-%   Ifmax      - flag: 1 for maximize fitness, 0 for minimize
-% Output:
-%   PopulationSelect - selected population (same size as input)
-
-    PopSize = length(Population);          % number of individuals
-
-    %--- Perform tournament for each slot ---
-    for n = 1:PopSize
-        s = randi(PopSize, 2, 1);          % pick two random candidates
-
-        if ~Ifmax                           % minimizing fitness
-            if Population(s(1)).fit < Population(s(2)).fit
-                IDX = s(1);
-            else
-                IDX = s(2);
-            end
-        else                                % maximizing fitness
-            if Population(s(1)).fit < Population(s(2)).fit
-                IDX = s(2);
-            else
-                IDX = s(1);
-            end
+        if Population(s(1)).fit < Population(s(2)).fit
+            IDX = s(1);
+        else
+            IDX = s(2);
         end
-
-        PopulationSelect(n) = Population(IDX); % winner goes to next gen
+    else
+        if Population(s(1)).fit < Population(s(2)).fit
+            IDX = s(2);
+        else
+            IDX = s(1);
+        end
     end
+    PopulationSelect(n) = Population(IDX);
+end
 end
